@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 5000;
 
 // Security middleware
 app.use(helmet());
-app.use(compression());
+app.use(compression() as any);
 
 // CORS configuration
 app.use(
@@ -92,10 +92,10 @@ app.get("/health", (req: Request, res: Response) => {
  */
 
 // Swagger API documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+app.use('/api-docs', ...swaggerUi.serve as any, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'DrinkBrewy API Documentation'
-}));
+}) as any);
 
 // API routes
 app.use("/api/products", productRoutes);

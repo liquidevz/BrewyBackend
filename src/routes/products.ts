@@ -1,125 +1,189 @@
-import express, { Request, Response } from 'express';
-import Product from '../models/Product';
-import { authenticateAdmin, AuthRequest } from '../middleware/auth';
+import express, { Request, Response } from "express";
+import Product from "../models/Product";
+import { authenticateAdmin, AuthRequest } from "../middleware/auth";
 
 const router = express.Router();
 
 // Get all products (public)
-router.get('/', async (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
   try {
-    const products = await Product.find({ availableForSale: true }).sort({ createdAt: -1 });
-    res.json(products);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await Promise.all([
+      Product.find({ availableForSale: true })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Product.countDocuments({ availableForSale: true }),
+    ]);
+
+    const mappedProducts = products.map((product) => ({
+      id: product.id, // Keeping as is from DB (String), user can cast if needed or we can parseInt if it's numeric
+      title: product.name,
+      body_html: product.description,
+      vendor: "Brewy",
+      product_type: "Hard Seltzer",
+      created_at: product.createdAt,
+      handle: product.handle,
+      updated_at: product.updatedAt,
+      tags: "Hard Seltzer, Alcohol, Brewy", // Static tags for now
+      status: product.availableForSale ? "active" : "draft",
+      variants: product.variants.map((v) => ({
+        id: v.id,
+        title: v.title,
+        price: v.price.toFixed(2),
+        compare_at_price: null,
+        sku: v.sku || "",
+        quantity: product.stock, // Using product stock as proxy since we don't have variant stock
+        created_at: product.createdAt,
+        updated_at: product.updatedAt,
+        taxable: true,
+        option_values: {},
+        grams: 0,
+        image: {
+          src: product.images[0] || "",
+        },
+        weight: 0,
+        weight_unit: "lb",
+      })),
+      image: {
+        src: product.images[0] || "",
+      },
+      options: [],
+    }));
+
+    res.json({
+      data: {
+        total,
+        products: mappedProducts,
+      },
+    });
   } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ error: 'Failed to fetch products' });
+    console.error("Error fetching products:", error);
+    res.status(500).json({ error: "Failed to fetch products" });
   }
 });
 
 // Get single product by ID or handle (public)
-router.get('/:identifier', async (req: Request, res: Response) => {
+router.get("/:identifier", async (req: Request, res: Response) => {
   try {
     const { identifier } = req.params;
     const product = await Product.findOne({
-      $or: [{ id: identifier }, { handle: identifier }]
+      $or: [{ id: identifier }, { handle: identifier }],
     });
-    
+
     if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: "Product not found" });
     }
-    
+
     res.json(product);
   } catch (error) {
-    console.error('Error fetching product:', error);
-    res.status(500).json({ error: 'Failed to fetch product' });
+    console.error("Error fetching product:", error);
+    res.status(500).json({ error: "Failed to fetch product" });
   }
 });
 
 // Create product (admin only)
-router.post('/', authenticateAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/", authenticateAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const productData = req.body;
-    
+
     // Check if product with same ID or handle exists
     const existingProduct = await Product.findOne({
-      $or: [{ id: productData.id }, { handle: productData.handle }]
+      $or: [{ id: productData.id }, { handle: productData.handle }],
     });
-    
+
     if (existingProduct) {
-      return res.status(400).json({ error: 'Product with this ID or handle already exists' });
+      return res
+        .status(400)
+        .json({ error: "Product with this ID or handle already exists" });
     }
-    
+
     const product = new Product(productData);
     await product.save();
-    
+
     res.status(201).json(product);
   } catch (error) {
-    console.error('Error creating product:', error);
-    res.status(500).json({ error: 'Failed to create product' });
+    console.error("Error creating product:", error);
+    res.status(500).json({ error: "Failed to create product" });
   }
 });
 
 // Update product (admin only)
-router.put('/:id', authenticateAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-    
-    const product = await Product.findOneAndUpdate(
-      { id },
-      updateData,
-      { new: true, runValidators: true }
-    );
-    
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+router.put(
+  "/:id",
+  authenticateAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      const product = await Product.findOneAndUpdate({ id }, updateData, {
+        new: true,
+        runValidators: true,
+      });
+
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      res.json(product);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ error: "Failed to update product" });
     }
-    
-    res.json(product);
-  } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ error: 'Failed to update product' });
   }
-});
+);
 
 // Delete product (admin only)
-router.delete('/:id', authenticateAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    
-    const product = await Product.findOneAndDelete({ id });
-    
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+router.delete(
+  "/:id",
+  authenticateAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const product = await Product.findOneAndDelete({ id });
+
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      res.json({ message: "Product deleted successfully", product });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ error: "Failed to delete product" });
     }
-    
-    res.json({ message: 'Product deleted successfully', product });
-  } catch (error) {
-    console.error('Error deleting product:', error);
-    res.status(500).json({ error: 'Failed to delete product' });
   }
-});
+);
 
 // Update stock (admin only)
-router.patch('/:id/stock', authenticateAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { stock } = req.body;
-    
-    const product = await Product.findOneAndUpdate(
-      { id },
-      { stock },
-      { new: true }
-    );
-    
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+router.patch(
+  "/:id/stock",
+  authenticateAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { stock } = req.body;
+
+      const product = await Product.findOneAndUpdate(
+        { id },
+        { stock },
+        { new: true }
+      );
+
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      res.json(product);
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      res.status(500).json({ error: "Failed to update stock" });
     }
-    
-    res.json(product);
-  } catch (error) {
-    console.error('Error updating stock:', error);
-    res.status(500).json({ error: 'Failed to update stock' });
   }
-});
+);
 
 export default router;

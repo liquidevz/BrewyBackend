@@ -4,6 +4,20 @@ import { authenticateAdmin, AuthRequest } from "../middleware/auth";
 
 const router = express.Router();
 
+const crypto = require("crypto");
+
+function stringToSafeInteger(inputString: string) {
+  // 1. Hash the string (SHA-256)
+  const hash = crypto.createHash("sha256").update(inputString).digest("hex");
+
+  // 2. Take the first 14 hex chars (14 * 4 = 56 bits), which is close to 53
+  // We slice it to ensure we fit in 53 bits.
+  const hexFragment = hash.substring(0, 13); // 13 chars * 4 = 52 bits (Safe)
+
+  // 3. Convert to a standard Number
+  return parseInt(hexFragment, 16);
+}
+
 // Get all products (public)
 router.get("/", async (req: Request, res: Response) => {
   try {
@@ -19,8 +33,10 @@ router.get("/", async (req: Request, res: Response) => {
       Product.countDocuments({ availableForSale: true }),
     ]);
 
+    console.log(products[0]._id.toString());
+
     const mappedProducts = products.map((product) => ({
-      id: product.id, // Keeping as is from DB (String), user can cast if needed or we can parseInt if it's numeric
+      id: stringToSafeInteger(product.id), // Ensure integer
       title: product.name,
       body_html: product.description,
       vendor: "Brewy",
@@ -28,19 +44,22 @@ router.get("/", async (req: Request, res: Response) => {
       created_at: product.createdAt,
       handle: product.handle,
       updated_at: product.updatedAt,
-      tags: "Hard Seltzer, Alcohol, Brewy", // Static tags for now
+      tags: "Hard Seltzer, Alcohol, Brewy",
       status: product.availableForSale ? "active" : "draft",
       variants: product.variants.map((v) => ({
-        id: v.id,
+        id: stringToSafeInteger(v.id), // Ensure integer
         title: v.title,
         price: v.price.toFixed(2),
-        compare_at_price: null as string | null,
+        compare_at_price: v.price.toFixed(2), // Default to price if no compare_at
         sku: v.sku || "",
-        quantity: product.stock, // Using product stock as proxy since we don't have variant stock
+        quantity: product.stock,
         created_at: product.createdAt,
         updated_at: product.updatedAt,
         taxable: true,
-        option_values: {},
+        option_values: {
+          Color: "Default", // Placeholder as data is missing in DB
+          Size: "Default", // Placeholder as data is missing in DB
+        },
         grams: 0,
         image: {
           src: product.images[0] || "",
@@ -51,7 +70,10 @@ router.get("/", async (req: Request, res: Response) => {
       image: {
         src: product.images[0] || "",
       },
-      options: [] as { name: string; values: string[] }[],
+      options: [
+        { name: "Color", values: ["Default"] },
+        { name: "Size", values: ["Default"] },
+      ],
     }));
 
     res.json({

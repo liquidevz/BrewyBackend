@@ -1,20 +1,20 @@
-import axios from 'axios';
-import crypto from 'crypto';
+import axios from "axios";
+import crypto from "crypto";
 
 /**
  * Shiprocket Checkout Service
  * Handles access token generation for Shiprocket Checkout
  */
 
-const SHIPROCKET_CHECKOUT_BASE_URL = 'https://checkout-api.shiprocket.com';
+const SHIPROCKET_CHECKOUT_BASE_URL = "https://checkout-api.shiprocket.com";
 
 // Helper function to generate HMAC-SHA256 signature
 const generateHMAC = (payload: object, secret: string): string => {
   const payloadString = JSON.stringify(payload);
   return crypto
-    .createHmac('sha256', secret)
+    .createHmac("sha256", secret)
     .update(payloadString)
-    .digest('base64');
+    .digest("base64");
 };
 
 export interface CheckoutCartItem {
@@ -51,7 +51,7 @@ export const generateAccessToken = async (
     const apiSecret = process.env.SHIPROCKET_API_SECRET;
 
     if (!apiKey || !apiSecret) {
-      throw new Error('Shiprocket API credentials not configured');
+      throw new Error("Shiprocket API credentials not configured");
     }
 
     // Add timestamp if not provided
@@ -61,13 +61,13 @@ export const generateAccessToken = async (
     const payload = {
       cart_data: params.cart_data,
       redirect_url: params.redirect_url,
-      timestamp
+      timestamp,
     };
 
     // Generate HMAC signature
     const hmacSignature = generateHMAC(payload, apiSecret);
 
-    console.log('Generating Shiprocket Checkout access token...');
+    console.log("Generating Shiprocket Checkout access token...");
 
     // Call Shiprocket Checkout API
     const response = await axios.post(
@@ -75,10 +75,10 @@ export const generateAccessToken = async (
       payload,
       {
         headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': apiKey,
-          'X-Api-HMAC-SHA256': hmacSignature
-        }
+          "Content-Type": "application/json",
+          "X-Api-Key": apiKey,
+          "X-Api-HMAC-SHA256": hmacSignature,
+        },
       }
     );
 
@@ -86,19 +86,26 @@ export const generateAccessToken = async (
       return {
         success: true,
         token: response.data.result.token,
-        data: response.data
+        data: response.data,
       };
     }
 
     return {
       success: false,
-      error: 'Token not found in response'
+      error: "Token not found in response",
     };
   } catch (error: any) {
-    console.error('Shiprocket Checkout token generation error:', error.response?.data || error.message);
+    console.log(error);
+    console.error(
+      "Shiprocket Checkout token generation error:",
+      error.response?.data || error.message
+    );
     return {
       success: false,
-      error: error.response?.data?.message || error.message || 'Failed to generate checkout token'
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to generate checkout token",
     };
   }
 };
@@ -106,15 +113,19 @@ export const generateAccessToken = async (
 /**
  * Verify HMAC signature for incoming webhooks
  */
-export const verifyWebhookHMAC = (payload: string, signature: string, secret: string): boolean => {
+export const verifyWebhookHMAC = (
+  payload: string,
+  signature: string,
+  secret: string
+): boolean => {
   const calculatedHMAC = crypto
-    .createHmac('sha256', secret)
+    .createHmac("sha256", secret)
     .update(payload)
-    .digest('hex');
+    .digest("hex");
   return calculatedHMAC === signature;
 };
 
 export default {
   generateAccessToken,
-  verifyWebhookHMAC
+  verifyWebhookHMAC,
 };

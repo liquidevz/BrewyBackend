@@ -9,7 +9,7 @@ class CheckoutController {
         z.object({
           variant_id: z.string().min(1, "variant_id is required"),
           quantity: z.number().min(1, "Quantity must be at least 1"),
-        }),
+        })
       )
       .min(1, "At least one item is required"),
     redirect_url: z.string().min(1, "redirect_url is required"),
@@ -32,7 +32,7 @@ class CheckoutController {
 
     ShiprocketCheckoutService.generateAccessToken({
       cart_data: { items },
-      redirect_url
+      redirect_url,
     })
       .then((result: any) => {
         return res.status(200).json(result);

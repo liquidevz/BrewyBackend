@@ -28,13 +28,16 @@ class CheckoutController {
       });
     }
 
-    const { items } = result.data;
+    const { items, redirect_url } = result.data;
 
-    ShiprocketCheckoutService.checkout(items, req.body.redirect_url)
-      .then((result) => {
+    ShiprocketCheckoutService.generateAccessToken({
+      cart_data: { items },
+      redirect_url
+    })
+      .then((result: any) => {
         return res.status(200).json(result);
       })
-      .catch((error) => {
+      .catch((error: any) => {
         return res.status(500).json({
           message: "Internal server error",
           error: error.message,

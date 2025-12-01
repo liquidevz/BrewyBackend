@@ -50,7 +50,7 @@ router.post('/create-order', async (req: Request, res: Response) => {
     // Create order in database
     const order = new Order({
       orderId,
-      razorpayOrderId: result.order.id,
+      razorpayOrderId: result.order?.id,
       amount: calculatedTotal,
       currency: currency || 'INR',
       status: 'created',
@@ -63,9 +63,9 @@ router.post('/create-order', async (req: Request, res: Response) => {
     res.json({
       success: true,
       orderId,
-      razorpayOrderId: result.order.id,
+      razorpayOrderId: result.order?.id,
       amount: calculatedTotal,
-      currency: result.order.currency,
+      currency: result.order?.currency,
       key: process.env.RAZORPAY_KEY_ID,
     });
   } catch (error) {

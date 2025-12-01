@@ -34,7 +34,7 @@ router.get("/", async (req: Request, res: Response) => {
         id: v.id,
         title: v.title,
         price: v.price.toFixed(2),
-        compare_at_price: null,
+        compare_at_price: null as string | null,
         sku: v.sku || "",
         quantity: product.stock, // Using product stock as proxy since we don't have variant stock
         created_at: product.createdAt,
@@ -51,7 +51,7 @@ router.get("/", async (req: Request, res: Response) => {
       image: {
         src: product.images[0] || "",
       },
-      options: [],
+      options: [] as { name: string; values: string[] }[],
     }));
 
     res.json({
